@@ -14,7 +14,7 @@ use REDCap;
 
 class SurveyShuffle extends AbstractExternalModule
 {
-    private $debug = false; // Activer/désactiver les logs
+    private $debug = true; // Activer/désactiver les logs
 
     /**
      * Hook triggered when a survey is completed
@@ -124,7 +124,7 @@ class SurveyShuffle extends AbstractExternalModule
      */
     private function isConfigurationValid($config)
     {
-        // Pour "From field", we need  entry_survey and order_field
+        // Pour "From field", on a besoin de entry_survey et order_field
         if ($config['shuffle_type'] === 'field') {
             $valid = !empty($config['entry_survey']) && !empty($config['order_field']);
             $this->log("From Field Validation: entry_survey=" . ($config['entry_survey'] ?: 'EMPTY') . 
@@ -132,7 +132,7 @@ class SurveyShuffle extends AbstractExternalModule
             return $valid;
         }
         
-        // Pour "Random", we need entry_survey and  shuffle_instruments
+        // Pour "Random", on a besoin de entry_survey et shuffle_instruments
         $valid = !empty($config['entry_survey']) && !empty($config['shuffle_instruments']);
         $this->log("Random Validation: entry_survey=" . ($config['entry_survey'] ?: 'EMPTY') . 
                    ", shuffle_instruments=" . (count($config['shuffle_instruments']) . " items") . " => " . ($valid ? "VALID" : "INVALID"));
@@ -212,7 +212,7 @@ class SurveyShuffle extends AbstractExternalModule
 
         $this->log("Checking conditions...");
 
-        
+        // Cas 1 : L'utilisateur vient de valider l'Entry Survey (ex: 'inter')
         if ($instrument === $config['entry_survey']) {
             $this->log("✓ Current instrument IS entry survey");
             $this->log("First instrument in order: " . $order[0]);
@@ -220,24 +220,25 @@ class SurveyShuffle extends AbstractExternalModule
             return;
         }
 
-        
+        // Cas 2 & 3 : L'utilisateur se trouve dans la liste ordonnée
         $key = array_search($instrument, $order);
 
         if ($key !== false) {
-            
+            // Si l'instrument n'est pas le dernier de la liste -> Aller au suivant
             if ($key < count($order) - 1) {
                 $this->log("✓ Current instrument IS in order list (position $key)");
                 $this->log("Next instrument in order: " . $order[$key + 1]);
                 $this->redirectToSurvey($order[$key + 1], $record, $event_id);
             } 
-            
+            // Si l'instrument est le dernier de la liste -> Aller à l'exit survey si défini
             elseif ($config['exit_survey']) {
                 $this->log("✓ Current instrument IS last in order");
                 $this->log("Redirecting to exit survey: " . $config['exit_survey']);
                 $this->redirectToSurvey($config['exit_survey'], $record, $event_id);
             }
         } else {
-            
+            // L'instrument complété (ex: 'a' ou 'b') ne fait pas partie de la séquence ordonnée
+            // On laisse REDCap effectuer son auto-continue par défaut.
             $this->log("✗ Current instrument is not entry survey and not in order list - letting REDCap handle flow.");
         }
 
@@ -307,7 +308,7 @@ class SurveyShuffle extends AbstractExternalModule
                 return [];
             }
 
-            
+            // Gère 'd, c' et 'd,c' en nettoyant les espaces superflus
             $order = array_map('trim', explode(',', $value));
             $this->log("Parsed order list: " . json_encode($order));
 
